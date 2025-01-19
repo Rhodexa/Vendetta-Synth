@@ -20,7 +20,7 @@
   However, I use oversampling to get decent dynamic range when it comes to the velocity. Because a timer has to be used, I need the timer to count and sample fast enought o get a 
   decent range.
   So maybe 120 to 240Hz if the ATmega328 can manage!
-  That gives us 1 second of travel for the gentle-est keyon at 120Hz.
+  That gives us 1 second of travel for the gentle-est key_is_on at 120Hz.
   Or 0.5s at 240Hz
 */
 
@@ -88,7 +88,7 @@ uint8_t iobus_getData(){
   IDLE  HALF_PRESS
  
             
-             KEYON_EVENT              KEYOFF_EVENT
+             key_is_on_EVENT              KEYOFF_EVENT
              v________________________ v
   __________/                         \______
 
@@ -100,7 +100,7 @@ uint8_t iobus_getData(){
   ____..--'' _____________________..--'' _____
 
              ^                           ^
-    KEYON VELOCITY SAMPLED      KEYOFF VELOCITY SAMPLED   
+    key_is_on VELOCITY SAMPLED      KEYOFF VELOCITY SAMPLED   
 
   All these stages are very relevant because
   * A Note ON  event can only be triggered once the key traveled from IDLE to PRESSED, but no other case.
@@ -145,13 +145,7 @@ uint8_t iobus_getData(){
   Hence, the HC245 transeiver IS needed, but only in one direction.
 */
 
-// It's actually 122 in hardware,
-// but because it is a 16x8 button matrix, there's actually 128 possible buttons, 6 of which are essentially ghosts.
-// Assuming they exist anyway makes the code resposible for scanning the keyboard much simpler
-// It's only six missed buttons anyways... this equates to three keys, so it's not a huge loss, only about 4.6% inefficient?
-// I mean, they are still there, you just need to add in the hardware for them. Free extra six buttons if you wanna go _haywire_, pun forcefully intended.
-// Half of the variables that depend on these may be hardcoded, so, be careful!
-const uint8_t N_KEYS = 128;
+const uint8_t N_KEYS = 64;
 const uint8_t N_COLUMNS = 16;
 
 enum KeyStates{
@@ -166,13 +160,12 @@ enum KeyEvents {
   RELEASED
 };
 
-
 struct Key {
-  volatile uint8_t current_state;
-  uint8_t last_state;
-  uint8_t keyon;
+  uint8_t state;
+  bool key_is_on;
   uint8_t event;
   uint8_t timer;
+  uint8_t travel_time;
 };
 Key key[N_KEYS];
 
@@ -187,31 +180,28 @@ void keyboard_scanAndProcess(){
     }
     iobus_setMode(INPUT);
     uint8_t column_data = iobus_getData();
-    key[i     ].current_state = ((column_data & 0x01) != 0) + ((column_data & 0x02) != 0); // Extract bits 0 and 1, then add them together. Yes, this makes sense.
-    key[i + 16].current_state = ((column_data & 0x04) != 0) + ((column_data & 0x08) != 0); // Now 0 = IDLE, 1 = HALF_PRESS, and 2 = FULL_PRESS
-    key[i + 32].current_state = ((column_data & 0x10) != 0) + ((column_data & 0x20) != 0); 
-    key[i + 48].current_state = ((column_data & 0x40) != 0) + ((column_data & 0x80) != 0); 
+    key[i     ].state = ((column_data & 0x01) != 0) + ((column_data & 0x02) != 0); // Extract bits 0 and 1, then add them together. Yes, this makes sense.
+    key[i + 16].state = ((column_data & 0x04) != 0) + ((column_data & 0x08) != 0); // Now 0 = IDLE, 1 = HALF_PRESS, and 2 = FULL_PRESS
+    key[i + 32].state = ((column_data & 0x10) != 0) + ((column_data & 0x20) != 0); 
+    key[i + 48].state = ((column_data & 0x40) != 0) + ((column_data & 0x80) != 0); 
   }
 
   // Process the states to get events and velocity information
   for (uint8_t i = 0; i < N_KEYS; i++) {
     // Key logic
-    if(key[i].current_state != key[i].last_state){ // There's been a change
-      if(key[i].current_state == KeyStates::FULL_PRESSED) {
-        if(key[i].keyon == 0) {
-          key[i].keyon = 1;
-        }
-      }
-      if(key[i].current_state == KeyStates::IDLE) {
-        if(key[i].keyon == 1) {
-          key[i].keyon = 0;
-        }
-      }
+    if((key[i].state == KeyStates::FULL_PRESS) && (key[i].key_is_on == false)){
+        key[i].key_is_on = true;
+        key[i].travel_time = key[i].timer;
+        key[i].event = KeyEvents::PRESSED;
     }
-    else if ()
+    else if((key[i].state == KeyStates::IDLE) && (key[i].key_is_on == true)) {
+        key[i].key_is_on = false;
+        key[i].travel_time = key[i].timer;
+        key[i].event = KeyEvents::RELEASED;
+    }
 
     // Timer section... the timer always counts when half_pressed, and gets reset in any other case
-    if((key[i].current_state == KeyStates::HALF_PRESS) && (key[i].timer < 255)) key[i].timer++;
+    if((key[i].state == KeyStates::HALF_PRESS) && (key[i].timer < 255)) key[i].timer++;
     else key[i].timer = 0;
   }
 }
@@ -219,6 +209,18 @@ void keyboard_scanAndProcess(){
 void setup() {
 }
 
+auto current_millis = millis();
+auto last_scan = current_millis;
+uint8_t time_divider = 0;
 void loop() {
-  keyboard_scanAndProcess();
+  if(current_millis - last_scan >= 8) {
+    last_scan = current_millis;
+    keyboard_scanAndProcess();
+    if(time_divider > 3){
+      time_divider = 0;
+      for(int i = 0; i < N_KEYS; i++) {
+        
+      }
+    }
+  }
 }
