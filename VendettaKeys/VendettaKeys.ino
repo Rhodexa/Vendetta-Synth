@@ -108,7 +108,44 @@ uint8_t iobus_getData(){
 
   Note: Key OFF velocity isn't a standard thing in MIDI stuff, it may or may not work on some setups. I provide a switch for that feature.
 
+  A bit about our keyboard's hardware:
+  Turns out it uses a 16 x 8 matrix:
+   8-bit Add = 1   8-bit Add = 2
+  [    HC 373   ] [    HC 373   ]      Add = 4
+  | | | | | | | | | | | | | | | |      ___
+  + + + + + + + + + + + + + + + + --> |   | KEY0 A \ Key 0
+  + + + + + + + + + + + + + + + + --> | H | KEY0 B / BA / State Bits
+  + + + + + + + + + + + + + + + + --> | C | KEY1 A \ Key 1
+  + + + + + + + + + + + + + + + + --> |   | KEY1 B / BA / State Bits
+  + + + + + + + + + + + + + + + + --> | 2 | KEY2 A \ Key 2
+  + + + + + + + + + + + + + + + + --> | 4 | KEY2 B / BA / State Bits
+  + + + + + + + + + + + + + + + + --> | 5 | KEY3 A \ Key 3
+  + + + + + + + + + + + + + + + + --> |___| KEY3 B / BA / State Bits
+
+  BA -> State bits
+  * 00: IDLE
+  * 01: Half-press
+  * 10: Shouldn't happen but it is still half-press
+  * 11: Full press
+
+  Keys are read in groups of four per byte, where the value or state of the key is encoded as two bits
+  [Key i*4 + 3][Key i*4 + 2][Key i*4 + 1][Key i*4 + 0]
+
+  The HC373 work as column selectors. Basically, to read column n, the value 1 << n should be written to the corresponding buffer.
+  For n > 7, the second buffer should be used.
+  Once the value is written to the flipflops, the HC245 should be selected for readout of the entire colum at once.
+
+  Note: Yes, the HC373 has an /OE signal, so -in theory- the HC245 shouldn't be needed. However, other things may communicate over the data buffer,
+  this means some non-keyboard-related signals could backfeed through the buttons if there's nothing to block the terminals out of the bus.
+  Hence, the HC245 transeiver IS needed, but only in one direction.
 */
+
+// It's actually 122 in hardware,
+// but because it is a 16x8 button matrix, there's actually 128 possible buttons, 6 of which are essentially ghosts.
+// Assuming they exist anyway makes the code resposible for scanning the keyboard much simpler
+// It's only six missed buttons anyways... this equates to three keys, so it's not a huge loss, only about 4.6% inefficient?
+// I mean, they are still there, you just need to add in the hardware for them. Free extra six buttons if you wanna go _haywire_, pun forcefully intended.
+const uint8_t N_KEYS = 128;
 
 enum KeyValues {
   IDLE,
@@ -119,6 +156,14 @@ enum KeyValues {
 struct Key {
   uint8_t state = 0; // Idle for now
 };
+
+Key keys[N_KEYS];
+
+void keyboard_scan(){
+  for (uint8_t i = 0; i < N_KEYS; i++) {
+    keys[i].state = 
+  }
+}
 
 void setup() {
 }
