@@ -28,19 +28,19 @@ inline uint8_t swapNibbles(uint8_t byte) {
 void iobus_setMode(uint8_t mode){  
   if(mode == OUTPUT) {
     // TODO: Add a failsafe. Set addressing lines to a state where we know everyone's quiet (Hi-Z) to prevent "accidents" like bus fights, when switching to OUTPUT mode
-    DDRD |= 0b11110000;
     DDRB |= 0b00001111;
+    DDRD |= 0b11110000;
   }
   else { // default to input, it is safer
-    DDRD &= 0b00001111;
     DDRB &= 0b11110000;
+    DDRD &= 0b00001111;
   }
 }
 
 void iobus_setData(uint8_t data){
   if(IOBUS_ENABLE_SWAP_NIBBLES) data = swapNibbles(data);
-  PORTD = (PORTD & 0b00001111) | (data & 0b11110000); 
   PORTB = (PORTB & 0b11110000) | (data & 0b00001111);
+  PORTD = (PORTD & 0b00001111) | (data & 0b11110000); 
 }
 
 uint8_t iobus_getData(){
