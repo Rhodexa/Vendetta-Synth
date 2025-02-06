@@ -51,7 +51,7 @@ auto current_millis = millis();
 auto last_scan = current_millis;
 void loop() {
   current_millis = millis();
-  if(current_millis - last_scan >= 4) {
+  if(current_millis - last_scan >= 1) {
     last_scan = current_millis;
     keyboard_scan();
     keyboard_findAndQueueKeyEvents();

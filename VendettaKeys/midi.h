@@ -74,7 +74,7 @@ struct MIDIProperties{
   int transpose = 0;
 
   // Allows you to send the velocity at wich the key was _released_. Some synths may do cool things with this, others may get confused!
-  bool send_note_off_velocity = false;
+  bool send_note_off_velocity = true;
 
   // Some systems may expect a Note ON event with 0 velocity rather than the standard Key OFF event! (Weird)
   bool send_note_on_with_zero_velocity = false;
@@ -95,8 +95,8 @@ void midi_reshapeQueue(){
     // now we need to rescale the velocity, since what we get from the scaner is actually how long it took for the key to go from one state to another,
     // we need to convert that into MIDI-compliant velocity
     uint8_t velocity = midi_note_queue[i].velocity;
-    if(velocity*4 > 255) velocity = 255;
-    else velocity *=  4;
+    /*if(velocity*4 > 255) velocity = 255;
+    else velocity *=  4;*/
     velocity = (255-velocity)/2; // for now, we are just gonna map it directly from 0 to 127.
     midi_note_queue[i].velocity = velocity;
   }
@@ -108,7 +108,8 @@ void midi_sendQueue(){
       midi_sendNoteOn(1, midi_note_queue[i].pitch, midi_note_queue[i].velocity);
     }
     else{
-      midi_sendNoteOn(1, midi_note_queue[i].pitch, 0);
+      if(midishape.send_note_off_velocity) midi_sendNoteOff(1, midi_note_queue[i].pitch, midi_note_queue[i].velocity);
+      else midi_sendNoteOn(1, midi_note_queue[i].pitch, 0);
     }
   }
 }
